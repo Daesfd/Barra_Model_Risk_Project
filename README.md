@@ -1,44 +1,62 @@
-# Otimizacao_de_Portifolio
-## Propriedades Comuns dos assets
-- Sem estacionariedade -> estátisticas de séries temporais financeiras mudam ao longo do tempo (retornos passados != perfomances futuras)
-- Cluster de volatilidade -> Variacoes grandes/pequenas do preço tendem a ter variações grandes/pequenas seguidas
-- Sem autocorrelação -> Hipótese dos mercados eficientes (HME)
-- Caudas longas -> Dados financeiros não seguem distribuição normal
-- Assimetria de retorno -> Distribuição de retornos não são simétricos
-- Correlação positiva de assets -> Assets movem junto com o mercado
+# Modelo de Fatores e Risco de Portfólio (Python)
 
-## Preços e retornos
-- Na modelagem, o log(pt) é mais conveniente de ser usado, já que os sinais de preço podem ser representados (preços pequenso são amplificados e preços grandes são atenuados)
-- Desse modo, o modelo mais simples é: yt = u + yt-1 + et; u = drift, et = ruido aleatório
+Este projeto tem como objetivo construir um modelo multifatorial de risco para portfólios de ações do mercado norte-americano, utilizando dados públicos da **SEC (EDGAR)** e da **Yahoo Finance**.  
+O pipeline coleta, processa e integra informações de **valor de mercado**, **patrimônio líquido**, e **retornos históricos** para calcular fatores como **SMB**, **HML** e **MOM**, além de estimar o **VaR (Value at Risk)** do portfólio.
 
-- O retorno é medido pela variação do preço, desse modo rt = (pt - pt-1) / pt-1 e é aditivo entre os assets
-- E o log-retorno é definido como rlogt = yt - yt-1 = log(pt / pt-1) e é aditivo no domínio de tempo.
-- Além disso, pelo modelo mais simples, temos que: rlogt = yt - yt-1 = u + et, que é estacionário.
+---
+## Ordem
 
-### Volatilidade
-- Entre 12-20% - baixa volatilidade
-- Acima de 30% - alta volatilidade
+python patrimonio_liq.py
+python mcap.py
+python Modelo.py
 
-### Retornos com estrutura linear
-- Medem a dependência no período temporal, que pela HME, é insignificante.
-- FAC - Correlação entre o sinal durante um tempo e um tempo anterior
-- FACP - Elimina o efeito do sinal nos últimos dois períodos
+## Funcionalidades dos Scripts
 
-### Retornos com estrutura não linear
-- Dado a pouca significância dos retornos lineares, pode-se pensar que não da para explorar a estrutura temporal do Asset.
-- Mas pode-se notar estruturas no envelopamento da volatilidade do sinal, que é algo não linear
+### `mcap.py`
+- Faz o *scraping* dos **CIKs** (identificadores oficiais da SEC) para os tickers selecionados.  
+- Coleta o número de ações em circulação (*shares outstanding*) e o preço diário das ações via **SEC API** e **Yahoo Finance**.  
+- Calcula o **market capitalization (valor de mercado)** de cada empresa e do S&P 500 total.  
+- Gera os arquivos:
+  - `dados_mcap.csv` → histórico de market cap das ações.
+  - `df_pesos_historicos.csv` → peso de cada ação no portfólio em relação ao S&P500.
 
-### Estrutura do Asset
-- Além da estrutura temporal, que pode ser usada para forecasting e modelagem, há a estrutura do Asset em si.
-- Desse modo, pode-se escolher o Asset a partir de outros Assets.
-- Isso é importante para ver o risco de um portfolio, dado que as ações podem ter diferentes correlações, então diversificar pode ser bom ou ruim para o portfolio.
-- Se eles estão correlacionados, então diversificar não reduz o risco.
+---
 
-## Modelagem IID
-- Por HME, o preço de um seguro é uma estimativa para o seu valor intrínseco.
-- Ou seja, qualquer informação sobre seu preço futuro já está encorporado no preço atual.
-- Ou seja, o preço é um passeio aleatório e o seu retorno é uma sequência de variáveis aleatórias iid.
+### `patrimonio_liq.py`
+- Obtém o **patrimônio líquido (book value)** das empresas a partir das demonstrações financeiras enviadas à **SEC (EDGAR)**.  
+- Identifica as tags contábeis adequadas (`StockholdersEquity`, `CommonStockholdersEquity`, etc.) e normaliza as datas.  
+- Gera o arquivo:
+  - `dados_pl.csv` → série temporal do patrimônio líquido das empresas analisadas.
 
-### Modelo IID
-- Seja N Assets, os quais podem ser bonds, equities, commodities, fundos ou moedas, e seja xt E R^N os retornos aleatórios dos Assets no tempo t.
-- Assim, os retornos são: xt = u + et, sendo u o retorno esperado e et um componente residual com média = 0 e com covariância
+---
+
+### `Modelo.py`
+- Utiliza os dados de **market cap** e **patrimônio líquido** para construir fatores de risco:
+  - **SMB (Small Minus Big)** — diferença de retorno entre empresas pequenas e grandes.  
+  - **HML (High Minus Low)** — diferença de retorno entre empresas com alto e baixo índice book-to-market.  
+  - **MOM (Momentum)** — diferença de retorno entre ações vencedoras e perdedoras no passado recente.
+- Regressões lineares múltiplas com **OLS (Statsmodels)** para estimar os betas fatoriais de cada ativo.  
+- Calcula:
+  - **Matriz de covariância total** (com fatores + resíduos),
+  - **Risco total do portfólio**,  
+  - **Value at Risk (VaR)** com 95% de confiança.
+- Salva os resultados em:
+  - `dados_modelo.csv`
+
+---
+
+## 📊 Principais Saídas
+
+| Arquivo | Descrição |
+|----------|------------|
+| `dados_mcap.csv` | Valor de mercado diário das ações analisadas |
+| `dados_pl.csv` | Patrimônio líquido (book value) das empresas |
+| `df_pesos_historicos.csv` | Pesos relativos no portfólio |
+| `dados_modelo.csv` | Dados finais com fatores e retornos para regressão |
+
+---
+
+## 🧠 Principais Bibliotecas
+- `pandas`, `numpy`, `matplotlib`, `seaborn`
+- `statsmodels`, `scipy`, `pypfopt`
+- `yfinance`, `requests`, `re`, `tqdm`
